@@ -176,7 +176,8 @@ const resolveWorkersSubdomain = (configured: string, scopeHint: string) =>
  * the account's Zero Trust team domain (one API read; the team is created —
  * named after the workers.dev subdomain — if the account has none);
  * POLICY_AUD is the audience tag of an alchemy-provisioned Access
- * application whose allow-policy comes from ACCESS_ALLOWED_EMAILS. Explicit
+ * application whose allow-policy comes from ACCESS_ALLOWED_EMAILS. It guards
+ * CUSTOM_DOMAIN when set, else the workers.dev hostname. Explicit
  * env values always win, so a hand-managed Access application keeps
  * working — set both TEAM_DOMAIN and POLICY_AUD and nothing here provisions.
  */
@@ -184,6 +185,7 @@ const resolveSelfHostAccess = (
   stage: string,
   provision: boolean,
   workersSubdomain: string,
+  customDomain: string,
 ) =>
   Effect.gen(function* () {
     let teamDomain = yield* optionalVar("TEAM_DOMAIN");
@@ -249,7 +251,7 @@ const resolveSelfHostAccess = (
         applicationId: "SelfHostAccess",
         policyName: `open-seo ${stage} self-host users`,
         applicationName: `open-seo ${stage}`,
-        domain: `${workerName(stage)}.${subdomain}`,
+        domain: customDomain || `${workerName(stage)}.${subdomain}`,
         emails: allowedEmails,
       });
       policyAud = application.aud;
@@ -367,10 +369,14 @@ export default Alchemy.Stack(
       authUrl = "";
     }
 
+    // Self-host only: serve the app from this hostname instead of workers.dev.
+    const customDomain = prod ? "" : yield* optionalVar("CUSTOM_DOMAIN");
+
     const access = yield* resolveSelfHostAccess(
       stage,
       authMode === "cloudflare_access" && !prod,
       workersSubdomain,
+      customDomain,
     );
 
     // Password accounts need a session secret. The self-host env file sets
@@ -461,7 +467,9 @@ export default Alchemy.Stack(
     const app = yield* Cloudflare.Worker("open-seo", {
       name: workerName(stage),
       // Prod serves the real domains; the zone is inferred from the hostname.
-      domain: prod ? ["app.openseo.so", "www.app.openseo.so"] : undefined,
+      domain: prod
+        ? ["app.openseo.so", "www.app.openseo.so"]
+        : customDomain || undefined,
       // Prebuilt worker from `vite build` (@cloudflare/vite-plugin). The entry
       // exports the DO + WorkflowEntrypoint classes (re-exported by
       // src/server.ts), which `bundle: false` requires. Sibling chunks under
