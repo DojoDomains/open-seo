@@ -76,6 +76,16 @@ pnpm install
 pnpm deploy:selfhost --yes
 ```
 
+## Using a custom domain
+
+Set `CUSTOM_DOMAIN` in `.env.selfhost` to a hostname whose zone is in the same Cloudflare account, then redeploy:
+
+```bash
+CUSTOM_DOMAIN=seo.example.com
+```
+
+The deploy attaches the hostname to the Worker and moves the Cloudflare Access application to it, so the workers.dev URL stops letting you in. Manage the domain only through this setting: each deploy detaches custom domains it was not asked for. If you use Search Console, add `https://seo.example.com/api/gsc/oauth/callback` to your Google OAuth client's redirect URIs.
+
 ## Giving teammates access
 
 Add the teammate to `ACCESS_ALLOWED_EMAILS` in `.env.selfhost` and redeploy. Dashboard edits to that Access policy are overwritten on the next deploy. (If you manage the Access application yourself, edit its Allow policy in Zero Trust instead.)
